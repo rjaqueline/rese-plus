@@ -1,0 +1,22 @@
+# ═══════════════════════════════════════════════════════════
+#  RESE+ — Dependencias Python
+# ═══════════════════════════════════════════════════════════
+
+# Django e REST Framework
+Django>=5.0,<6.0
+djangorestframework>=3.14,<4.0
+
+# CORS
+django-cors-headers>=4.3,<5.0
+
+# Variaveis de ambiente
+python-dotenv>=1.0,<2.0
+
+# QR Codes e imagens
+qrcode>=7.4,<8.0
+Pillow>=10.0,<12.0
+
+# ═══════════════════════════════════════════════════════════
+#  NOTA: Para instalar tudo de uma vez, rode:
+#  pip install -r requirements.txt
+# ═══════════════════════════════════════════════════════════
