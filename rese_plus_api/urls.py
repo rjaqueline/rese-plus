@@ -20,27 +20,27 @@ router.register('usuarios', UsuarioViewSet)
 
 urlpatterns = [
     # Viewsets
-    path('api/', include(router.urls)),
+    path('api/v1/', include(router.urls)),
 
     # JWT — Token refresh (nao precisa de auth)
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/v1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Auth (nao precisa de auth)
-    path('api/login/', login),
-    path('api/login-auto/', login_auto),
+    path('api/v1/login/', login),
+    path('api/v1/login-auto/', login_auto),
 
     # Endpoints autenticados
-    path('api/cadastro-completo/', cadastro_completo),
-    path('api/dar-baixa/<int:pk>/', dar_baixa),
-    path('api/gerar-qrcodes/', gerar_qrcodes_lote),
-    path('api/vincular-qrcode/', vincular_qrcode),
-    path('api/desvincular-qrcode/<int:pk>/', desvincular_qrcode),
-    path('api/scan/', scan_qrcode),
-    path('api/etiquetas/', gerar_etiquetas_png),
-    path('api/etiqueta/<str:codigo>/', gerar_etiqueta_unica),
-    path('api/baixa-qrcode/', baixa_qrcode),
+    path('api/v1/cadastro-completo/', cadastro_completo),
+    path('api/v1/dar-baixa/<int:pk>/', dar_baixa),
+    path('api/v1/gerar-qrcodes/', gerar_qrcodes_lote),
+    path('api/v1/vincular-qrcode/', vincular_qrcode),
+    path('api/v1/desvincular-qrcode/<int:pk>/', desvincular_qrcode),
+    path('api/v1/scan/', scan_qrcode),
+    path('api/v1/etiquetas/', gerar_etiquetas_png),
+    path('api/v1/etiqueta/<str:codigo>/', gerar_etiqueta_unica),
+    path('api/v1/baixa-qrcode/', baixa_qrcode),
 
     # Senha
-    path('api/trocar-senha/', trocar_senha),
-    path('api/validar-senha/', validar_senha),
+    path('api/v1/trocar-senha/', trocar_senha),
+    path('api/v1/validar-senha/', validar_senha),
 ]
