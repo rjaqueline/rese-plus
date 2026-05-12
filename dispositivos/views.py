@@ -10,7 +10,7 @@ from .models import Empregado, Dispositivo, Registro, Baixa, Usuario, QrCode, Lo
 from .serializers import (
     EmpregadoSerializer, DispositivoSerializer, RegistroSerializer,
     BaixaSerializer, UsuarioSerializer, LoginSerializer,
-    CadastroCompletoSerializer, QrCodeSerializer
+    CadastroCompletoSerializer, QrCodeSerializer, LogAuditoriaSerializer
 )
 import re
 # ═══════════════════════════════════════════════════════════
@@ -674,3 +674,105 @@ def gerar_etiqueta_unica(request, codigo):
     response = HttpResponse(img_buffer.getvalue(), content_type='image/png')
     response['Content-Disposition'] = 'attachment; filename="etiqueta_' + codigo + '.png"'
     return response
+
+
+# ═══════════════════════════════════════════════════════════
+#  ENDPOINT: LISTAR LOGS DE AUDITORIA
+#  Acesso: SOMENTE perfil "master"
+#  Atende: Politica CRP-TIN-TIN-POL-016 item 5 (Taboca)
+# ═══════════════════════════════════════════════════════════
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def listar_logs_auditoria(request):
+    """
+    Lista logs de auditoria com filtros e paginacao.
+    SO usuarios com perfil 'master' podem acessar.
+    """
+    # Pega user_id do JWT (claim customizada que adicionamos)
+    user_id = request.auth.get('user_id') if request.auth else None
+    
+    if not user_id:
+        return Response(
+            {'erro': 'Token invalido (sem user_id)'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Busca o usuario no nosso modelo customizado
+    try:
+        usuario_logado = Usuario.objects.get(pk=user_id, ativo=True)
+    except Usuario.DoesNotExist:
+        return Response(
+            {'erro': 'Usuario nao encontrado ou inativo'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # SO master pode acessar
+    if usuario_logado.perfil != 'master':
+        registrar_log(
+            request=request,
+            usuario=usuario_logado,
+            acao='OUTRO',
+            descricao=f'Tentativa de acessar logs de auditoria sem permissao (perfil: {usuario_logado.perfil})',
+            sucesso=False,
+        )
+        return Response(
+            {'erro': 'Acesso negado. Apenas Master pode visualizar logs.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Comeca com TODOS os logs (ordenados pelo Meta do model)
+    queryset = LogAuditoria.objects.all()
+    
+    # FILTROS opcionais
+    usuario_id = request.query_params.get('usuario_id')
+    if usuario_id:
+        queryset = queryset.filter(usuario_id=usuario_id)
+    
+    acao = request.query_params.get('acao')
+    if acao:
+        queryset = queryset.filter(acao=acao)
+    
+    data_inicio = request.query_params.get('data_inicio')
+    if data_inicio:
+        queryset = queryset.filter(timestamp__date__gte=data_inicio)
+    
+    data_fim = request.query_params.get('data_fim')
+    if data_fim:
+        queryset = queryset.filter(timestamp__date__lte=data_fim)
+    
+    sucesso_filtro = request.query_params.get('sucesso')
+    if sucesso_filtro is not None:
+        queryset = queryset.filter(sucesso=sucesso_filtro.lower() == 'true')
+    
+    # PAGINACAO
+    try:
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 50))
+    except ValueError:
+        page = 1
+        page_size = 50
+    
+    page_size = min(page_size, 200)
+    
+    total = queryset.count()
+    inicio = (page - 1) * page_size
+    fim = inicio + page_size
+    logs_paginados = queryset[inicio:fim]
+    
+    serializer = LogAuditoriaSerializer(logs_paginados, many=True)
+    
+    # LOG: auditoria da auditoria! 🤯
+    registrar_log(
+        request=request,
+        usuario=usuario_logado,
+        acao='OUTRO',
+        descricao=f'Visualizou logs de auditoria (pagina {page}, filtros: usuario={usuario_id}, acao={acao})',
+    )
+    
+    return Response({
+        'total': total,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': (total + page_size - 1) // page_size,
+        'logs': serializer.data,
+    })

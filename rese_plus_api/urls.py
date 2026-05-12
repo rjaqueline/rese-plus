@@ -7,7 +7,7 @@ from dispositivos.views import (
     login, login_auto, cadastro_completo, dar_baixa, gerar_qrcodes_lote,
     vincular_qrcode, desvincular_qrcode, scan_qrcode,
     gerar_etiquetas_png, gerar_etiqueta_unica, baixa_qrcode,
-    trocar_senha, validar_senha,
+    trocar_senha, validar_senha, listar_logs_auditoria,
 )
 
 router = DefaultRouter()
@@ -43,4 +43,5 @@ urlpatterns = [
     # Senha
     path('api/v1/trocar-senha/', trocar_senha),
     path('api/v1/validar-senha/', validar_senha),
+    path('api/v1/logs-auditoria/', listar_logs_auditoria),
 ]

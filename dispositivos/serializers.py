@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Empregado, Dispositivo, Registro, Baixa, Usuario, QrCode
+from .models import Empregado, Dispositivo, Registro, Baixa, Usuario, QrCode, LogAuditoria
 
 class EmpregadoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -77,3 +77,33 @@ class QrCodeSerializer(serializers.ModelSerializer):
         if obj.dispositivo and obj.dispositivo.empregado:
             return obj.dispositivo.empregado.nome
         return ''
+        
+        # ═══════════════════════════════════════════════════════════
+#  LOG DE AUDITORIA — Serializer
+#  Atende: Politica CRP-TIN-TIN-POL-016 (Taboca)
+# ═══════════════════════════════════════════════════════════
+class LogAuditoriaSerializer(serializers.ModelSerializer):
+    """Serializa logs de auditoria pra exibicao no Flutter."""
+    
+    # Versao "humana" da acao: "Login realizado" em vez de "LOGIN"
+    acao_label = serializers.CharField(source='get_acao_display', read_only=True)
+    
+    class Meta:
+        model = LogAuditoria
+        fields = [
+            'id',
+            'usuario',
+            'usuario_nome',
+            'usuario_username',
+            'acao',
+            'acao_label',
+            'descricao',
+            'objeto_tipo',
+            'objeto_id',
+            'objeto_descricao',
+            'ip',
+            'sucesso',
+            'timestamp',
+        ]
+        # TODOS os campos sao READONLY (log e imutavel!)
+        read_only_fields = fields
