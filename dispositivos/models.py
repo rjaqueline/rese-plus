@@ -142,3 +142,96 @@ class QrCode(models.Model):
 
     class Meta:
         ordering = ['codigo']
+        # ═══════════════════════════════════════════════════════════
+#  LogAuditoria — Rastreabilidade de acoes sensiveis
+#  Atende: Politica CRP-TIN-TIN-POL-016 (Taboca)
+#  Retencao: 90 dias minimo
+# ═══════════════════════════════════════════════════════════
+class LogAuditoria(models.Model):
+    """
+    Registro imutavel de acoes realizadas no sistema.
+    Cada acao sensivel cria uma linha aqui.
+    """
+    
+    # Tipos de acoes categorizadas
+    ACOES = [
+        # Autenticacao
+        ('LOGIN', 'Login realizado'),
+        ('LOGOUT', 'Logout realizado'),
+        ('LOGIN_FALHA', 'Tentativa de login falhada'),
+        
+        # Senhas
+        ('SENHA_TROCADA', 'Senha alterada pelo proprio usuario'),
+        ('SENHA_RESETADA', 'Senha resetada por administrador'),
+        ('SENHA_EXPIRADA', 'Senha expirou'),
+        
+        # Usuarios (CRUD)
+        ('USUARIO_CRIADO', 'Novo usuario criado'),
+        ('USUARIO_EDITADO', 'Usuario editado'),
+        ('USUARIO_DESATIVADO', 'Usuario desativado'),
+        
+        # Dispositivos (CRUD)
+        ('DISPOSITIVO_CRIADO', 'Novo dispositivo cadastrado'),
+        ('DISPOSITIVO_EDITADO', 'Dispositivo editado'),
+        ('DISPOSITIVO_BAIXA', 'Dispositivo dado baixa'),
+        
+        # QR Codes
+        ('QR_GERADO', 'QR Code gerado em lote'),
+        ('QR_VINCULADO', 'QR Code vinculado a dispositivo'),
+        ('QR_DESVINCULADO', 'QR Code desvinculado'),
+        ('QR_INUTILIZADO', 'QR Code inutilizado'),
+        
+        # Movimentacoes
+        ('SCAN_CHECKIN', 'Check-in via scan'),
+        ('SCAN_CHECKOUT', 'Check-out via scan'),
+        
+        # Outros
+        ('OUTRO', 'Outra acao'),
+    ]
+    
+    # Quem fez a acao
+    usuario = models.ForeignKey(
+        'Usuario',
+        on_delete=models.SET_NULL,  # Se usuario for deletado, mantem log
+        null=True,
+        blank=True,
+        related_name='logs_auditoria',
+        verbose_name='Usuario'
+    )
+    
+    # Nome cacheado (pra caso usuario seja deletado)
+    usuario_nome = models.CharField(max_length=200, blank=True)
+    usuario_username = models.CharField(max_length=100, blank=True)
+    
+    # O que aconteceu
+    acao = models.CharField(max_length=50, choices=ACOES)
+    descricao = models.TextField(blank=True)
+    
+    # Em qual objeto (opcional)
+    objeto_tipo = models.CharField(max_length=50, blank=True)  # Ex: "Dispositivo", "Usuario"
+    objeto_id = models.IntegerField(null=True, blank=True)
+    objeto_descricao = models.CharField(max_length=200, blank=True)  # Ex: "Notebook Dell SN12345"
+    
+    # Contexto de rede (forense)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    
+    # Sucesso ou falha
+    sucesso = models.BooleanField(default=True)
+    
+    # Timestamp (imutavel)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Log de Auditoria'
+        verbose_name_plural = 'Logs de Auditoria'
+        ordering = ['-timestamp']  # Mais recentes primeiro
+        indexes = [
+            models.Index(fields=['-timestamp']),
+            models.Index(fields=['usuario', '-timestamp']),
+            models.Index(fields=['acao', '-timestamp']),
+        ]
+    
+    def __str__(self):
+        nome = self.usuario_username or self.usuario_nome or 'Sistema'
+        return f'[{self.timestamp:%d/%m/%Y %H:%M}] {nome} - {self.get_acao_display()}'

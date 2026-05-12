@@ -6,13 +6,87 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 from datetime import timedelta
-from .models import Empregado, Dispositivo, Registro, Baixa, Usuario, QrCode
+from .models import Empregado, Dispositivo, Registro, Baixa, Usuario, QrCode, LogAuditoria
 from .serializers import (
     EmpregadoSerializer, DispositivoSerializer, RegistroSerializer,
     BaixaSerializer, UsuarioSerializer, LoginSerializer,
     CadastroCompletoSerializer, QrCodeSerializer
 )
 import re
+# ═══════════════════════════════════════════════════════════
+#  HELPER: REGISTRAR LOG DE AUDITORIA
+#  Atende Politica CRP-TIN-TIN-POL-016 (rastreabilidade)
+# ═══════════════════════════════════════════════════════════
+def registrar_log(
+    request=None,
+    usuario=None,
+    acao='OUTRO',
+    descricao='',
+    objeto_tipo='',
+    objeto_id=None,
+    objeto_descricao='',
+    sucesso=True,
+):
+    """
+    Registra uma entrada no log de auditoria.
+    
+    Uso simples:
+        registrar_log(request, usuario, 'LOGIN', 'Login bem sucedido')
+    
+    Uso com objeto:
+        registrar_log(
+            request, usuario, 'DISPOSITIVO_EDITADO',
+            descricao='Trocou o serial',
+            objeto_tipo='Dispositivo',
+            objeto_id=dispositivo.id,
+            objeto_descricao=dispositivo.serial,
+        )
+    
+    Uso pra falha (tentativa de invasao):
+        registrar_log(
+            request, None, 'LOGIN_FALHA',
+            descricao=f'Tentativa com username: {email}',
+            sucesso=False,
+        )
+    """
+    try:
+        # Captura IP e user agent (forense)
+        ip = None
+        user_agent = ''
+        if request is not None:
+            # IP real considerando proxy (X-Forwarded-For)
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(',')[0].strip()
+            else:
+                ip = request.META.get('REMOTE_ADDR')
+            user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]
+        
+        # Dados do usuario (cacheados)
+        usuario_nome = ''
+        usuario_username = ''
+        if usuario is not None:
+            usuario_nome = getattr(usuario, 'nome', '') or ''
+            usuario_username = getattr(usuario, 'username', '') or ''
+        
+        # Cria o log
+        LogAuditoria.objects.create(
+            usuario=usuario,
+            usuario_nome=usuario_nome,
+            usuario_username=usuario_username,
+            acao=acao,
+            descricao=descricao[:1000],  # Limita a 1000 chars
+            objeto_tipo=objeto_tipo,
+            objeto_id=objeto_id,
+            objeto_descricao=objeto_descricao[:200],
+            ip=ip,
+            user_agent=user_agent,
+            sucesso=sucesso,
+        )
+    except Exception as e:
+        # CRITICO: nunca quebrar a view por causa de log
+        # Se falhar, apenas imprime mas nao impede o sistema de continuar
+        print(f'[AUDIT LOG ERROR] {e}')
 
 
 def validar_politica_senha(senha):
@@ -138,26 +212,58 @@ def login(request):
     serializer = LoginSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    username = serializer.validated_data['username']
+    username = serializer.validated_data.get('username', '')
     senha = serializer.validated_data['senha']
     perfil = serializer.validated_data['perfil']
 
     try:
         usuario = Usuario.objects.get(username=username, ativo=True)
     except Usuario.DoesNotExist:
+        # LOG: tentativa de login com usuario inexistente
+        registrar_log(
+            request=request,
+            usuario=None,
+            acao='LOGIN_FALHA',
+            descricao=f'Tentativa de login com username inexistente: {username}',
+            sucesso=False,
+        )
         return Response({'erro': 'Usuario ou senha incorretos'}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_password(senha, usuario.senha):
         usuario.tentativas_login_falhas += 1
         usuario.save()
+        # LOG: senha incorreta
+        registrar_log(
+            request=request,
+            usuario=usuario,
+            acao='LOGIN_FALHA',
+            descricao=f'Senha incorreta. Tentativa #{usuario.tentativas_login_falhas}',
+            sucesso=False,
+        )
         return Response({'erro': 'Usuario ou senha incorretos'}, status=status.HTTP_401_UNAUTHORIZED)
 
     if usuario.perfil != perfil:
+        # LOG: perfil errado (suspeito!)
+        registrar_log(
+            request=request,
+            usuario=usuario,
+            acao='LOGIN_FALHA',
+            descricao=f'Tentativa de login no perfil errado. Solicitou {perfil}, tem {usuario.perfil}',
+            sucesso=False,
+        )
         return Response({'erro': 'Perfil incorreto para este usuario'}, status=status.HTTP_403_FORBIDDEN)
 
     usuario.tentativas_login_falhas = 0
     usuario.ultimo_login = timezone.now()
     usuario.save()
+
+    # LOG: LOGIN BEM SUCEDIDO 🎉
+    registrar_log(
+        request=request,
+        usuario=usuario,
+        acao='LOGIN',
+        descricao=f'Login bem sucedido como {usuario.perfil}',
+    )
 
     tokens = gerar_tokens_para_usuario(usuario)
     data = UsuarioSerializer(usuario).data
@@ -179,16 +285,38 @@ def login_auto(request):
     try:
         usuario = Usuario.objects.get(username=username, ativo=True)
     except Usuario.DoesNotExist:
+        registrar_log(
+            request=request,
+            usuario=None,
+            acao='LOGIN_FALHA',
+            descricao=f'Login auto: username inexistente: {username}',
+            sucesso=False,
+        )
         return Response({'erro': 'Usuario ou senha incorretos'}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_password(senha, usuario.senha):
         usuario.tentativas_login_falhas += 1
         usuario.save()
+        registrar_log(
+            request=request,
+            usuario=usuario,
+            acao='LOGIN_FALHA',
+            descricao=f'Login auto: senha incorreta. Tentativa #{usuario.tentativas_login_falhas}',
+            sucesso=False,
+        )
         return Response({'erro': 'Usuario ou senha incorretos'}, status=status.HTTP_401_UNAUTHORIZED)
 
     usuario.tentativas_login_falhas = 0
     usuario.ultimo_login = timezone.now()
     usuario.save()
+
+    # LOG: LOGIN AUTO BEM SUCEDIDO
+    registrar_log(
+        request=request,
+        usuario=usuario,
+        acao='LOGIN',
+        descricao=f'Login auto bem sucedido como {usuario.perfil}',
+    )
 
     tokens = gerar_tokens_para_usuario(usuario)
     data = UsuarioSerializer(usuario).data
@@ -220,6 +348,13 @@ def trocar_senha(request):
         return Response({'erro': 'Usuario nao encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
     if not check_password(senha_atual, usuario.senha):
+        registrar_log(
+            request=request,
+            usuario=usuario,
+            acao='LOGIN_FALHA',
+            descricao='Tentativa de trocar senha com senha atual incorreta',
+            sucesso=False,
+        )
         return Response({'erro': 'Senha atual incorreta'}, status=status.HTTP_401_UNAUTHORIZED)
 
     valido, erro = validar_politica_senha(senha_nova)
@@ -234,6 +369,14 @@ def trocar_senha(request):
     usuario.atualizar_expiracao_senha()
     usuario.save()
 
+    # LOG: SENHA TROCADA PELO PROPRIO USUARIO
+    registrar_log(
+        request=request,
+        usuario=usuario,
+        acao='SENHA_TROCADA',
+        descricao='Usuario alterou a propria senha',
+    )
+
     tokens = gerar_tokens_para_usuario(usuario)
 
     return Response({
@@ -242,7 +385,6 @@ def trocar_senha(request):
         'access': tokens['access'],
         'refresh': tokens['refresh'],
     })
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
