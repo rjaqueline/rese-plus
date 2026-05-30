@@ -13,6 +13,9 @@ from .serializers import (
     CadastroCompletoSerializer, QrCodeSerializer, LogAuditoriaSerializer
 )
 import re
+import secrets
+import string
+
 # ═══════════════════════════════════════════════════════════
 #  HELPER: REGISTRAR LOG DE AUDITORIA
 #  Atende Politica CRP-TIN-TIN-POL-016 (rastreabilidade)
@@ -681,6 +684,7 @@ def gerar_etiqueta_unica(request, codigo):
 #  Acesso: SOMENTE perfil "master"
 #  Atende: Politica CRP-TIN-TIN-POL-016 item 5 (Taboca)
 # ═══════════════════════════════════════════════════════════
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def listar_logs_auditoria(request):
@@ -776,3 +780,78 @@ def listar_logs_auditoria(request):
         'total_pages': (total + page_size - 1) // page_size,
         'logs': serializer.data,
     })
+
+# ═══════════════════════════════════════════════════════════
+#  RESET DE SENHA PELO MASTER
+#  Gera senha temporaria forte e obriga troca no proximo login.
+#  Registra no audit log. Acesso: SOMENTE master.
+# ═══════════════════════════════════════════════════════════
+
+
+def gerar_senha_temporaria(tamanho=12):
+    """Gera senha aleatoria que atende a politica de senha."""
+    maiusculas = string.ascii_uppercase
+    minusculas = string.ascii_lowercase
+    numeros = string.digits
+    especiais = '!@#$%&*'
+    # Garante pelo menos 1 de cada categoria
+    senha = [
+        secrets.choice(maiusculas),
+        secrets.choice(minusculas),
+        secrets.choice(numeros),
+        secrets.choice(especiais),
+    ]
+    todos = maiusculas + minusculas + numeros + especiais
+    senha += [secrets.choice(todos) for _ in range(tamanho - 4)]
+    secrets.SystemRandom().shuffle(senha)
+    return ''.join(senha)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def resetar_senha(request, usuario_id):
+    # 1. Quem ta pedindo precisa ser master
+    solicitante_id = request.auth.get('user_id') if request.auth else None
+    if not solicitante_id:
+        return Response({'erro': 'Token invalido'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        solicitante = Usuario.objects.get(pk=solicitante_id, ativo=True)
+    except Usuario.DoesNotExist:
+        return Response({'erro': 'Usuario solicitante nao encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    if solicitante.perfil != 'master':
+        registrar_log(
+            request=request, usuario=solicitante, acao='OUTRO',
+            descricao=f'Tentativa de resetar senha sem permissao (perfil: {solicitante.perfil})',
+            sucesso=False,
+        )
+        return Response({'erro': 'Apenas Master pode resetar senhas'}, status=status.HTTP_403_FORBIDDEN)
+
+    # 2. Busca o usuario alvo
+    try:
+        alvo = Usuario.objects.get(pk=usuario_id)
+    except Usuario.DoesNotExist:
+        return Response({'erro': 'Usuario alvo nao encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    # 3. Gera senha temporaria e aplica
+    senha_temp = gerar_senha_temporaria()
+    alvo.senha = make_password(senha_temp)
+    alvo.precisa_trocar_senha = True
+    alvo.tentativas_login_falhas = 0
+    alvo.atualizar_expiracao_senha()
+    alvo.save()
+
+    # 4. Registra no audit log (rastreabilidade!)
+    registrar_log(
+        request=request, usuario=solicitante, acao='SENHA_RESETADA',
+        descricao=f'Resetou a senha de {alvo.username} ({alvo.nome})',
+        objeto_tipo='Usuario', objeto_id=alvo.id, objeto_descricao=alvo.username,
+    )
+
+    return Response({
+        'mensagem': 'Senha resetada com sucesso',
+        'usuario': alvo.username,
+        'senha_temporaria': senha_temp,
+        'aviso': 'Compartilhe com o usuario. Ele sera obrigado a trocar no proximo login.',
+    })   

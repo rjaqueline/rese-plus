@@ -44,4 +44,6 @@ urlpatterns = [
     path('api/v1/trocar-senha/', trocar_senha),
     path('api/v1/validar-senha/', validar_senha),
     path('api/v1/logs-auditoria/', listar_logs_auditoria),
+    # Reset de senha (SO master)
+    path('api/v1/resetar-senha/<int:usuario_id>/', resetar_senha),
 ]
