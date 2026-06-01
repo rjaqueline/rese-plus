@@ -272,6 +272,21 @@ def login(request):
         )
         return Response({'erro': 'Usuario ou senha incorretos'}, status=status.HTTP_401_UNAUTHORIZED)
 
+ # ⬇️ ADICIONA AQUI — bloqueio por excesso de tentativas
+    if usuario.tentativas_login_falhas >= 10:
+        registrar_log(
+            request=request,
+            usuario=usuario,
+            acao='LOGIN_FALHA',
+            descricao=f'Tentativa em conta bloqueada ({usuario.tentativas_login_falhas} tentativas)',
+            sucesso=False,
+        )
+        return Response(
+            {'erro': 'Conta bloqueada por excesso de tentativas. Contate o administrador.'},
+            status=status.HTTP_423_LOCKED,
+        )
+
+
     if not check_password(senha, usuario.senha):
         usuario.tentativas_login_falhas += 1
         usuario.save()
@@ -336,6 +351,20 @@ def login_auto(request):
             sucesso=False,
         )
         return Response({'erro': 'Usuario ou senha incorretos'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Bloqueio por excesso de tentativas (Politica Taboca)
+    if usuario.tentativas_login_falhas >= 5:
+        registrar_log(
+            request=request,
+            usuario=usuario,
+            acao='LOGIN_FALHA',
+            descricao=f'Tentativa em conta bloqueada ({usuario.tentativas_login_falhas} tentativas)',
+            sucesso=False,
+        )
+        return Response(
+            {'erro': 'Conta bloqueada por excesso de tentativas. Contate o administrador.'},
+            status=status.HTTP_423_LOCKED,
+        )
 
     if not check_password(senha, usuario.senha):
         usuario.tentativas_login_falhas += 1
