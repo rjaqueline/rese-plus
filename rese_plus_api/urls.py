@@ -12,6 +12,7 @@ from dispositivos.views import (
     resetar_senha,
     refresh_token,
     listar_ultimos_registros,
+    meu_perfil,
 )
 router = DefaultRouter()
 router.register('empregados', EmpregadoViewSet)
@@ -51,6 +52,7 @@ urlpatterns = [
     path('api/v1/resetar-senha/<int:usuario_id>/', resetar_senha),
     path('api/v1/scan/', scan_qrcode),
     path('api/v1/ultimos-registros/', listar_ultimos_registros),
+
     
 ]
 ''

@@ -1021,4 +1021,33 @@ def listar_ultimos_registros(request):
         .order_by('-id')[:limit]
     )
     serializer = RegistroSerializer(registros, many=True)
-    return Response(serializer.data)     
+    return Response(serializer.data)  
+    # ═══════════════════════════════════════════════════════════
+#  MEU PERFIL — dados do usuario logado + dias ate expirar
+# ═══════════════════════════════════════════════════════════
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def meu_perfil(request):
+    user_id = request.auth.get('user_id') if request.auth else None
+    if not user_id:
+        return Response({'erro': 'Token invalido'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        usuario = Usuario.objects.get(pk=user_id, ativo=True)
+    except Usuario.DoesNotExist:
+        return Response({'erro': 'Usuario nao encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    dias_restantes = None
+    if usuario.senha_expira_em:
+        delta = usuario.senha_expira_em - timezone.now()
+        dias_restantes = max(0, delta.days)
+
+    return Response({
+        'id': usuario.id,
+        'nome': usuario.nome,
+        'username': usuario.username,
+        'email': usuario.email or '',
+        'perfil': usuario.perfil,
+        'dias_ate_expirar': dias_restantes,
+        'precisa_trocar_senha': usuario.precisa_trocar_senha,
+    })   
