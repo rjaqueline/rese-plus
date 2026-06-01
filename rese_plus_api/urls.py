@@ -7,9 +7,12 @@ from dispositivos.views import (
     login, login_auto, cadastro_completo, dar_baixa, gerar_qrcodes_lote,
     vincular_qrcode, desvincular_qrcode, scan_qrcode,
     gerar_etiquetas_png, gerar_etiqueta_unica, baixa_qrcode,
-    trocar_senha, validar_senha, listar_logs_auditoria,
+    trocar_senha, validar_senha,
+    listar_logs_auditoria,
+    resetar_senha,
+    refresh_token,
+    listar_ultimos_registros,
 )
-
 router = DefaultRouter()
 router.register('empregados', EmpregadoViewSet)
 router.register('dispositivos', DispositivoViewSet)
@@ -23,8 +26,7 @@ urlpatterns = [
     path('api/v1/', include(router.urls)),
 
     # JWT — Token refresh (nao precisa de auth)
-    path('api/v1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-
+    path('api/v1/token/refresh/', refresh_token, name='token_refresh'),
     # Auth (nao precisa de auth)
     path('api/v1/login/', login),
     path('api/v1/login-auto/', login_auto),
@@ -36,6 +38,7 @@ urlpatterns = [
     path('api/v1/vincular-qrcode/', vincular_qrcode),
     path('api/v1/desvincular-qrcode/<int:pk>/', desvincular_qrcode),
     path('api/v1/scan/', scan_qrcode),
+    
     path('api/v1/etiquetas/', gerar_etiquetas_png),
     path('api/v1/etiqueta/<str:codigo>/', gerar_etiqueta_unica),
     path('api/v1/baixa-qrcode/', baixa_qrcode),
@@ -46,4 +49,8 @@ urlpatterns = [
     path('api/v1/logs-auditoria/', listar_logs_auditoria),
     # Reset de senha (SO master)
     path('api/v1/resetar-senha/<int:usuario_id>/', resetar_senha),
+    path('api/v1/scan/', scan_qrcode),
+    path('api/v1/ultimos-registros/', listar_ultimos_registros),
+    
 ]
+''

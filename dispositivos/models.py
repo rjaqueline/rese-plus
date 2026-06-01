@@ -100,6 +100,9 @@ class Usuario(models.Model):
         default=True,
         help_text='True no primeiro login ou quando admin resetou a senha'
     )
+    @property
+    def is_authenticated(self):
+        return True
     senha_expira_em = models.DateTimeField(
         null=True,
         blank=True,

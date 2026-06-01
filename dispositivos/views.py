@@ -1,4 +1,5 @@
-﻿from rest_framework import viewsets, status
+﻿from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -15,7 +16,6 @@ from .serializers import (
 import re
 import secrets
 import string
-
 # ═══════════════════════════════════════════════════════════
 #  HELPER: REGISTRAR LOG DE AUDITORIA
 #  Atende Politica CRP-TIN-TIN-POL-016 (rastreabilidade)
@@ -179,11 +179,28 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         usuario.atualizar_expiracao_senha()
         usuario.save()
 
+        # Audit log: quem criou + quem foi criado
+        solicitante_id = request.auth.get('user_id') if request.auth else None
+        solicitante = Usuario.objects.filter(pk=solicitante_id).first() if solicitante_id else None
+        registrar_log(
+            request=request,
+            usuario=solicitante,
+            acao='USUARIO_CRIADO',
+            descricao=f'Criou usuario {usuario.username} ({usuario.nome}) com perfil {usuario.perfil}',
+            objeto_tipo='Usuario',
+            objeto_id=usuario.id,
+            objeto_descricao=usuario.username,
+        )
+
         return Response(UsuarioSerializer(usuario).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         usuario = self.get_object()
         senha_pura = request.data.get('senha', '')
+
+        # Snapshot antes — pra detectar o que mudou
+        ativo_antes = usuario.ativo
+        perfil_antes = usuario.perfil
 
         serializer = self.get_serializer(usuario, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -197,6 +214,29 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             usuario.precisa_trocar_senha = True
             usuario.atualizar_expiracao_senha()
             usuario.save()
+
+        # Audit log: descreve o que mudou
+        mudancas = []
+        if usuario.ativo != ativo_antes:
+            mudancas.append('ATIVADO' if usuario.ativo else 'DESATIVADO')
+        if usuario.perfil != perfil_antes:
+            mudancas.append(f'perfil alterado de {perfil_antes} para {usuario.perfil}')
+        if senha_pura:
+            mudancas.append('senha alterada')
+        if not mudancas:
+            mudancas.append('dados editados')
+
+        solicitante_id = request.auth.get('user_id') if request.auth else None
+        solicitante = Usuario.objects.filter(pk=solicitante_id).first() if solicitante_id else None
+        registrar_log(
+            request=request,
+            usuario=solicitante,
+            acao='USUARIO_EDITADO',
+            descricao=f'{", ".join(mudancas)} - {usuario.username} ({usuario.nome})',
+            objeto_tipo='Usuario',
+            objeto_id=usuario.id,
+            objeto_descricao=usuario.username,
+        )
 
         return Response(UsuarioSerializer(usuario).data)
 
@@ -329,7 +369,39 @@ def login_auto(request):
     data['refresh'] = tokens['refresh']
     return Response(data)
 
+# ═══════════════════════════════════════════════════════════
+#  REFRESH DE TOKEN (customizado p/ modelo Usuario proprio)
+#  O refresh padrao do SimpleJWT procura na tabela auth.User,
+#  que nao usamos. Esta versao usa nossa tabela Usuario.
+# ═══════════════════════════════════════════════════════════
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def refresh_token(request):
+    token_str = request.data.get('refresh')
+    if not token_str:
+        return Response({'erro': 'Refresh token obrigatorio'}, status=status.HTTP_400_BAD_REQUEST)
 
+    try:
+        refresh = RefreshToken(token_str)
+    except TokenError:
+        return Response({'erro': 'Refresh token invalido ou expirado'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user_id = refresh.get('user_id')
+    if not user_id:
+        return Response({'erro': 'Token sem user_id'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        usuario = Usuario.objects.get(pk=user_id, ativo=True)
+    except Usuario.DoesNotExist:
+        return Response({'erro': 'Usuario nao encontrado'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Gera novo access token com as claims customizadas
+    access = refresh.access_token
+    access['user_id'] = usuario.id
+    access['username'] = usuario.username
+    access['perfil'] = usuario.perfil
+
+    return Response({'access': str(access)})
 # ===============================================================
 #  TROCAR SENHA
 # ===============================================================
@@ -514,27 +586,6 @@ def desvincular_qrcode(request, pk):
 
 
 @api_view(['POST'])
-def scan_qrcode(request):
-    codigo = request.data.get('codigo', '')
-    try:
-        qr = QrCode.objects.select_related('dispositivo').get(codigo=codigo)
-        if not qr.dispositivo:
-            return Response({'status': 'nao_vinculado', 'mensagem': 'QR nao vinculado'})
-        dispositivo = qr.dispositivo
-        ultimo = Registro.objects.filter(dispositivo=dispositivo).order_by('-id').first()
-        if not ultimo:
-            novo_tipo = 'CHECK-IN'
-        elif ultimo.tipo == 'CHECK-IN':
-            novo_tipo = 'CHECK-OUT'
-        else:
-            novo_tipo = 'CHECK-IN'
-        Registro.objects.create(dispositivo=dispositivo, empregado=dispositivo.empregado, tipo=novo_tipo)
-        return Response({'status': 'ok', 'acao': novo_tipo, 'dispositivo': DispositivoSerializer(dispositivo).data})
-    except QrCode.DoesNotExist:
-        return Response({'status': 'nao_encontrado', 'mensagem': 'QR nao encontrado'}, status=404)
-
-
-@api_view(['POST'])
 def baixa_qrcode(request):
     qrcode_id = request.data.get('qrcode_id', None)
     motivo = request.data.get('motivo', '')
@@ -559,6 +610,73 @@ def baixa_qrcode(request):
         })
     except QrCode.DoesNotExist:
         return Response({'erro': 'QR Code nao encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+def scan_qrcode(request):
+    codigo = request.data.get('codigo', '').strip()
+    acao_solicitada = request.data.get('acao', '').strip().upper()
+
+    if not codigo:
+        return Response(
+            {'status': 'erro', 'mensagem': 'Codigo nao informado'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        qr = QrCode.objects.select_related('dispositivo').get(codigo=codigo)
+    except QrCode.DoesNotExist:
+        return Response(
+            {'status': 'nao_encontrado', 'mensagem': 'QR nao encontrado'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if not qr.dispositivo:
+        return Response({
+            'status': 'nao_vinculado',
+            'mensagem': 'QR nao vinculado a nenhum dispositivo',
+        })
+
+    dispositivo = qr.dispositivo
+    ultimo = Registro.objects.filter(dispositivo=dispositivo).order_by('-id').first()
+
+    # Decide a acao
+    if acao_solicitada in ('CHECK-IN', 'CHECK-OUT'):
+        novo_tipo = acao_solicitada
+    elif ultimo is None:
+        # Primeira leitura — assume ENTRADA por padrao
+        # Se for saida, vigilante escaneia 2x pra alternar
+        novo_tipo = 'CHECK-IN'
+    elif ultimo.tipo == 'CHECK-IN':
+        novo_tipo = 'CHECK-OUT'
+    else:
+        novo_tipo = 'CHECK-IN'
+
+    Registro.objects.create(
+        dispositivo=dispositivo,
+        empregado=dispositivo.empregado,
+        tipo=novo_tipo,
+    )
+
+    # Audit log
+    user_id = request.auth.get('user_id') if request.auth else None
+    operador = Usuario.objects.filter(pk=user_id).first() if user_id else None
+    nome_empregado = dispositivo.empregado.nome if dispositivo.empregado else 'sem responsavel'
+    registrar_log(
+        request=request,
+        usuario=operador,
+        acao='SCAN_CHECKIN' if novo_tipo == 'CHECK-IN' else 'SCAN_CHECKOUT',
+        descricao=f'{novo_tipo}: {dispositivo.serial} - {nome_empregado}',
+        objeto_tipo='Dispositivo',
+        objeto_id=dispositivo.id,
+        objeto_descricao=dispositivo.serial,
+    )
+
+    return Response({
+        'status': 'ok',
+        'acao': novo_tipo,
+        'dispositivo': DispositivoSerializer(dispositivo).data,
+    })
 
 
 # ===============================================================
@@ -854,4 +972,24 @@ def resetar_senha(request, usuario_id):
         'usuario': alvo.username,
         'senha_temporaria': senha_temp,
         'aviso': 'Compartilhe com o usuario. Ele sera obrigado a trocar no proximo login.',
-    })   
+    })  
+
+# ═══════════════════════════════════════════════════════════
+#  ÚLTIMOS REGISTROS — pro feed do painel da portaria
+# ═══════════════════════════════════════════════════════════
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def listar_ultimos_registros(request):
+    try:
+        limit = int(request.query_params.get('limit', 5))
+    except ValueError:
+        limit = 5
+    limit = max(1, min(limit, 50))
+
+    registros = (
+        Registro.objects
+        .select_related('dispositivo', 'empregado')
+        .order_by('-id')[:limit]
+    )
+    serializer = RegistroSerializer(registros, many=True)
+    return Response(serializer.data)     

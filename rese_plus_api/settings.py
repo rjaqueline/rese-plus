@@ -3,7 +3,7 @@ RESE+ — Configuracoes Django
 Versao com seguranca completa:
   - SECRET_KEY em .env
   - CORS restrito
-  - JWT com rotacao de refresh token
+  - JWT com autenticacao customizada via modelo Usuario
   - Permissoes IsAuthenticated nas views
 """
 from pathlib import Path
@@ -85,7 +85,7 @@ if DEBUG:
     print(f'  DEBUG: {DEBUG}')
     print(f'  ALLOWED_HOSTS: {ALLOWED_HOSTS}')
     print(f'  CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}')
-    print(f'  JWT Access: 1h | Refresh: 7 dias (com rotacao)')
+    print(f'  JWT Access: 1h | Refresh: 7 dias')
     print('═══════════════════════════════════════════════════════')
     print('')
 
@@ -132,11 +132,12 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ═══════════════════════════════════════════════════════════
-#  REST FRAMEWORK — JWT como autenticacao padrao
+#  REST FRAMEWORK — usa nossa autenticacao customizada
+#  (UsuarioJWTAuthentication busca na tabela Usuario, nao no auth.User)
 # ═══════════════════════════════════════════════════════════
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'dispositivos.authentication.UsuarioJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -145,13 +146,13 @@ REST_FRAMEWORK = {
 }
 
 # ═══════════════════════════════════════════════════════════
-#  SIMPLE JWT
+#  SIMPLE JWT — rotacao desligada (refresh customizado em views.py)
 # ═══════════════════════════════════════════════════════════
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
     'UPDATE_LAST_LOGIN': False,
 
     'ALGORITHM': 'HS256',
