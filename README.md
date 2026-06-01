@@ -1,200 +1,204 @@
-# RESE+
+# RESE+ — Sistema de Rastreamento e Controle de Equipamentos
 
-**Sistema de Gestão Patrimonial com Controle de Entrada e Saída de Equipamentos**
+![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
+![Django](https://img.shields.io/badge/Django-6.0-092E20?logo=django)
+![Flutter](https://img.shields.io/badge/Flutter-Web-02569B?logo=flutter)
+![License](https://img.shields.io/badge/licença-Uso%20Restrito-red)
 
-Sistema full-stack desenvolvido para rastreamento e controle de dispositivos (notebooks, celulares, tablets) em ambiente corporativo, com suporte a QR Codes, leitor de câmera/Bluetooth e controle de acesso por perfil.
+> Sistema desenvolvido de forma independente por **Jaqueline Batista** para digitalizar e automatizar o controle de entrada e saída de equipamentos na **Mineração Taboca** (Presidente Figueiredo, AM).
 
 ---
 
-## ✨ Funcionalidades
+## 📋 Sobre o Projeto
 
-### Gestão de Patrimônio
-- Cadastro de dispositivos (notebook, celular, tablet, outros)
-- Suporte a 3 categorias: próprios, terceiros e visitantes
-- Vinculação dispositivo ↔ empregado
-- Histórico completo de check-in/check-out
-- Baixa de dispositivos com 8 motivos rastreáveis
+O RESE+ substituiu um processo 100% manual (planilhas e papel) por um sistema web completo com rastreamento via QR Code, painel de portaria em tempo real e trilha de auditoria completa — atendendo à Política de Segurança da Informação CRP-TIN-TIN-POL-016.
 
-### QR Codes
-- Geração em lote (prefixo + numeração automática)
-- Impressão em etiquetas Niimbot D11 (15x50mm a 300 DPI)
-- Download de ZIP com PNGs prontos para impressão
-- Vinculação automática QR ↔ dispositivo
-- Leitor integrado (câmera do celular + Bluetooth)
+### O problema que resolve
 
-### Controle de Acesso
-- 3 perfis: Admin Master, Usuário, Operador
-- Interface dedicada para vigilância/portaria
-- Autenticação com hash PBKDF2-SHA256 (1.2M iterações)
-- Política de senha forte (8+ caracteres, maiúscula, minúscula, número, especial)
-- Troca obrigatória no primeiro login
-- Expiração periódica de senha (90 dias)
-- Indicador visual de força em tempo real
+- ❌ Controle manual de notebooks, celulares e tablets entrando e saindo da mineração
+- ❌ Sem rastreabilidade de quem levou o quê e quando
+- ❌ Sem histórico auditável para conformidade
+
+### A solução
+
+- ✅ QR Codes únicos por dispositivo (impressão via Niimbot D11)
+- ✅ Painel de portaria com leitor USB — registra entrada/saída automaticamente
+- ✅ Audit log completo de todas as operações
+- ✅ Exportação Excel para relatórios gerenciais
+
+---
+
+## 🚀 Funcionalidades
+
+### Painel da Portaria (Telão)
+- Leitor USB de QR Code integrado
+- Auto-decisão CHECK-IN / CHECK-OUT baseada no último registro
+- Feed em tempo real das últimas 10 leituras
+- Interface de tela cheia para monitor dedicado na portaria
+
+### Gestão de Equipamentos
+- Cadastro completo (empregado + dispositivo + QR em uma operação)
+- Vinculação/desvinculação de QR Codes
+- Histórico de movimentações com filtros
+- Exportação Excel com dados completos
 
 ### Segurança
-- Variáveis sensíveis em `.env` (fora do repositório)
-- CORS restrito a origens autorizadas
-- Headers de segurança HTTP em produção (HSTS, XSS, Clickjacking)
-- Contagem de tentativas de login falhas
-- Auditoria com registro de último login
+- Autenticação JWT com modelo de usuário customizado
+- Rate limiting no login (bloqueio após 5 tentativas)
+- Política de expiração de senha configurável
+- Trilha de auditoria de todos os CRUDs (quem fez, o quê, quando)
+- Aviso de expiração de senha na interface (7 e 3 dias)
+
+### Administração
+- 3 perfis de acesso: Master, Admin, Operador
+- Reset de senha com senha temporária forte
+- Logs de auditoria filtráveis e exportáveis
+- Gerenciamento completo de usuários
 
 ---
 
-## 🛠️ Stack Tecnológica
+## 🛠️ Stack Técnica
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Backend | Django 6.0 + Django REST Framework |
+| Autenticação | JWT customizado (SimpleJWT) |
+| Frontend | Flutter Web |
+| Banco de dados | SQLite (dev) / PostgreSQL (prod) |
+| Documentação API | drf-spectacular (OpenAPI 3.0 / Swagger) |
+| Impressão de etiquetas | Niimbot D11 via ZIP de PNGs |
+| Controle de versão | Git + GitHub |
+
+---
+
+## 📡 Documentação da API
+
+A API é documentada automaticamente via Swagger UI:
+
+```
+GET /api/docs/     → Interface Swagger interativa
+GET /api/schema/   → Schema OpenAPI 3.0 (JSON)
+```
+
+Principais endpoints:
+
+```
+POST /api/v1/login-auto/          → Autenticação JWT
+POST /api/v1/scan/                → Scan QR (auto CHECK-IN / CHECK-OUT)
+GET  /api/v1/ultimos-registros/   → Feed do painel de portaria
+GET  /api/v1/meu-perfil/          → Perfil + dias até expirar senha
+GET  /api/v1/logs-auditoria/      → Trilha de auditoria
+POST /api/v1/resetar-senha/       → Reset de senha pelo Master
+GET  /api/v1/exportar-excel/      → Exportação de dados
+```
+
+---
+
+## 🏗️ Arquitetura
+
+```
+rese-plus/
+├── rese_plus_api/          # Configurações Django
+│   ├── settings.py
+│   └── urls.py
+└── dispositivos/           # App principal
+    ├── models.py           # Usuario, Dispositivo, Empregado,
+    │                       # Registro, QrCode, LogAuditoria
+    ├── views.py            # Toda a lógica de negócio
+    ├── serializers.py
+    ├── authentication.py   # JWT customizado p/ modelo Usuario
+    └── migrations/
+```
+
+```
+flutter-app/
+└── lib/
+    ├── modules/
+    │   ├── auth/           # Login, TrocarSenha
+    │   └── rese/
+    │       ├── pages/      # Painel, Scanner, Histórico,
+    │       │               # Dispositivos, QrCodes, Exportação,
+    │       │               # Logs, MeuPerfil, Gerenciar Usuários
+    │       └── rese_home_page.dart
+    └── services/
+        ├── api_service.dart    # Comunicação com o backend
+        └── auth_service.dart   # Gestão de tokens JWT
+```
+
+---
+
+## ⚙️ Como rodar localmente
 
 ### Backend
-- **Python 3.12**
-- **Django 5** + Django REST Framework
-- **SQLite** (em produção: PostgreSQL recomendado)
-- **Pillow** + **qrcode** para geração de etiquetas
-- **python-dotenv** para gerenciamento de variáveis
-
-### Frontend
-- **Flutter 3.9+**
-- **mobile_scanner** para leitura de QR via câmera
-- **printing** para geração e compartilhamento de arquivos
-- **http** para integração com API REST
-
-### Infraestrutura
-- Suporte a execução local e deploy em nuvem
-- Estrutura modular preparada para PostgreSQL + Redis
-
----
-
-## 📐 Arquitetura
-
-```
-rese_plus/
-├── rese_plus_api/          # Configuração Django
-│   ├── settings.py         # Configurações + .env
-│   └── urls.py             # Rotas da API
-├── dispositivos/           # App principal
-│   ├── models.py           # Empregado, Dispositivo, Registro, Baixa, Usuario, QrCode
-│   ├── views.py            # Endpoints REST
-│   ├── serializers.py      # Serialização de dados
-│   └── migrations/
-├── .env                    # Variáveis sensíveis (não versionado)
-├── .gitignore
-└── requirements.txt
-
-flutter_projects/rese_plus/
-├── lib/
-│   ├── modules/
-│   │   ├── auth/           # Login, troca de senha
-│   │   ├── rese/           # Páginas do sistema
-│   │   └── vigilante/      # Interface do operador
-│   └── services/
-│       └── api_service.dart
-└── pubspec.yaml
-```
-
----
-
-## 🚀 Como Executar Localmente
-
-### Pré-requisitos
-- Python 3.12+
-- Flutter 3.9+
-- Git
-
-### Backend (Django)
 
 ```bash
-# 1. Clone o repositório
-git clone <url-do-repo>
-cd django_projects
+# Clonar e entrar na pasta
+git clone https://github.com/rjaqueline/rese-plus.git
+cd rese-plus
 
-# 2. Crie e ative o ambiente virtual
+# Ambiente virtual
 python -m venv venv
-# Windows:
-.\venv\Scripts\Activate
-# Linux/Mac:
-source venv/bin/activate
+venv\Scripts\Activate      # Windows
+source venv/bin/activate   # Linux/Mac
 
-# 3. Instale as dependências
+# Dependências
 pip install -r requirements.txt
 
-# 4. Configure o .env (copie o .env.example e ajuste)
-cp .env.example .env
-# Edite o .env com suas configurações
-
-# 5. Rode as migrations
-python manage.py makemigrations
+# Banco de dados
 python manage.py migrate
 
-# 6. Crie um usuário admin master
-python manage.py shell
-# Dentro do shell:
+# Criar superusuário
+python manage.py shell -c "
 from dispositivos.models import Usuario
 from django.contrib.auth.hashers import make_password
 Usuario.objects.create(
-    nome='Admin',
-    email='admin@exemplo.com',
-    senha=make_password('SenhaForte@2026'),
+    username='admin',
+    nome='Administrador',
     perfil='master',
+    senha=make_password('Admin@2026'),
+    ativo=True
 )
-exit()
+"
 
-# 7. Inicie o servidor
+# Rodar
 python manage.py runserver
 ```
 
 ### Frontend (Flutter)
 
 ```bash
-cd flutter_projects/rese_plus
-
-# Instale as dependências
+cd flutter-app
 flutter pub get
-
-# Rode no navegador
-flutter run -d chrome
-
-# Ou em dispositivo Android
-flutter run
+flutter run -d chrome --web-port=3000
 ```
 
 ---
 
-## 🗺️ Roadmap
+## 🔒 Segurança & Conformidade
 
-### ✅ Concluído
-- [x] CRUD completo de dispositivos, empregados, registros
-- [x] 3 perfis de acesso com interfaces dedicadas
-- [x] Geração em lote e impressão de QR Codes
-- [x] Leitor de câmera e Bluetooth no mobile
-- [x] Segurança de senha (hash + política + expiração)
-- [x] Variáveis em `.env` + CORS restrito
-
-### 🔄 Em desenvolvimento
-- [ ] JWT com refresh token
-- [ ] Permissões `IsAuthenticated` nas views
-- [ ] Hospedagem em nuvem (Azure / Railway)
-
-### 💡 Futuro
-- [ ] Integração com RFID UHF para inventário rápido
-- [ ] Dashboard analítico com gráficos
-- [ ] Exportação de relatórios em Excel/PDF
-- [ ] Integração com sistemas corporativos (Senior)
-- [ ] App mobile nativo (iOS/Android)
+| Requisito | Implementação |
+|-----------|--------------|
+| Rastreabilidade | Log de auditoria em 100% das operações |
+| Controle de acesso | 3 perfis com permissões distintas |
+| Proteção de credenciais | JWT + expiração + rate limiting |
+| Política de senha | Expiração configurável + troca obrigatória |
+| Proteção contra força bruta | Bloqueio após 5 tentativas (HTTP 423) |
 
 ---
 
-## 👩‍💻 Desenvolvimento
+## 📊 Contexto de Desenvolvimento
 
-Desenvolvido por Jaqueline Santos como projeto de evolução técnica e portfólio profissional, com foco em boas práticas de:
-
-- Arquitetura modular (separação clara entre backend e frontend)
-- Segurança (OWASP Top 10, políticas corporativas)
-- UX (feedback em tempo real, dark mode, interface limpa)
-- Código limpo (separação de responsabilidades, nomenclatura clara)
+- **Desenvolvido por:** Jaqueline Batista
+- **Início:** Novembro 2025
+- **Contexto:** Projeto independente, desenvolvido em paralelo à função administrativa na Mineração Taboca
+- **Status:** Em fase de testes com implantação prevista para 2026
 
 ---
 
 ## 📄 Licença
 
-Projeto privado — todos os direitos reservados.
+Este sistema foi desenvolvido por **Jaqueline Batista** e cedido para uso pela Mineração Taboca sob Termo de Cessão Limitada de Uso. A propriedade intelectual permanece com a autora.
 
 ---
 
-*Última atualização: abril de 2026*
+*Desenvolvido com 🖤 e muito café em Manaus, AM.*
