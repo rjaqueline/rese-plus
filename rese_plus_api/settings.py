@@ -47,8 +47,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'drf_spectacular',
     'corsheaders',
     'dispositivos',
+    
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -143,6 +145,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DATETIME_FORMAT': '%d/%m/%Y %H:%M:%S',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # ═══════════════════════════════════════════════════════════
@@ -180,3 +183,16 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# ═══════════════════════════════════════════════════════════
+#  SWAGGER — drf-spectacular
+# ═══════════════════════════════════════════════════════════
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'RESE+ API',
+    'DESCRIPTION': 'Sistema de Rastreamento e Controle de Entrada e Saida de Equipamentos — Mineracao Taboca',
+    'VERSION': '1.0.0',
+    'CONTACT': {'name': 'Jaqueline Batista', 'email': 'rjaquelinesantos@gmail.com'},
+    'LICENSE': {'name': 'Uso Restrito — Mineracao Taboca'},
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+

@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from dispositivos.views import (
     EmpregadoViewSet, DispositivoViewSet, RegistroViewSet, BaixaViewSet,
     UsuarioViewSet, QrCodeViewSet,
@@ -52,6 +53,9 @@ urlpatterns = [
     path('api/v1/resetar-senha/<int:usuario_id>/', resetar_senha),
     path('api/v1/scan/', scan_qrcode),
     path('api/v1/ultimos-registros/', listar_ultimos_registros),
+ # Documentação Swagger
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),   
 
     
 ]
