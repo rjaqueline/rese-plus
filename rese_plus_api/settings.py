@@ -186,7 +186,7 @@ if not DEBUG:
                                     SECURE_HSTS_SECONDS = 31536000
                                         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
                                             SECURE_HSTS_PRELOAD = True
-                                            
+
 # ═══════════════════════════════════════════════════════════
 #  SWAGGER — drf-spectacular
 # ═══════════════════════════════════════════════════════════
@@ -199,4 +199,11 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
