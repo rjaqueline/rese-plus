@@ -1,204 +1,394 @@
 # RESE+ — Sistema de Rastreamento e Controle de Equipamentos
 
-![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
-![Django](https://img.shields.io/badge/Django-6.0-092E20?logo=django)
-![Flutter](https://img.shields.io/badge/Flutter-Web-02569B?logo=flutter)
-![License](https://img.shields.io/badge/licença-Uso%20Restrito-red)
+Sistema web para rastreamento e controle da entrada e saída de equipamentos por meio de QR Code.
 
-> Sistema desenvolvido de forma independente por **Jaqueline Batista** para digitalizar e automatizar o controle de entrada e saída de equipamentos na **Mineração Taboca** (Presidente Figueiredo, AM).
+O RESE+ foi desenvolvido para substituir controles manuais baseados em planilhas e registros em papel, oferecendo rastreabilidade das movimentações, controle de acesso por perfil e trilha de auditoria.
 
----
-
-## 📋 Sobre o Projeto
-
-O RESE+ substituiu um processo 100% manual (planilhas e papel) por um sistema web completo com rastreamento via QR Code, painel de portaria em tempo real e trilha de auditoria completa — atendendo à Política de Segurança da Informação CRP-TIN-TIN-POL-016.
-
-### O problema que resolve
-
-- ❌ Controle manual de notebooks, celulares e tablets entrando e saindo da mineração
-- ❌ Sem rastreabilidade de quem levou o quê e quando
-- ❌ Sem histórico auditável para conformidade
-
-### A solução
-
-- ✅ QR Codes únicos por dispositivo (impressão via Niimbot D11)
-- ✅ Painel de portaria com leitor USB — registra entrada/saída automaticamente
-- ✅ Audit log completo de todas as operações
-- ✅ Exportação Excel para relatórios gerenciais
+> Projeto desenvolvido de forma independente por **Jaqueline Batista**, a partir de uma necessidade real identificada em ambiente corporativo.
 
 ---
 
-## 🚀 Funcionalidades
+## Sobre o projeto
 
-### Painel da Portaria (Telão)
-- Leitor USB de QR Code integrado
-- Auto-decisão CHECK-IN / CHECK-OUT baseada no último registro
-- Feed em tempo real das últimas 10 leituras
-- Interface de tela cheia para monitor dedicado na portaria
+O controle de entrada e saída de equipamentos como notebooks, celulares e tablets exigia registros manuais e consultas em diferentes fontes de informação.
 
-### Gestão de Equipamentos
-- Cadastro completo (empregado + dispositivo + QR em uma operação)
-- Vinculação/desvinculação de QR Codes
-- Histórico de movimentações com filtros
-- Exportação Excel com dados completos
+O RESE+ centraliza esse processo em uma aplicação web integrada a uma API REST.
 
-### Segurança
-- Autenticação JWT com modelo de usuário customizado
-- Rate limiting no login (bloqueio após 5 tentativas)
-- Política de expiração de senha configurável
-- Trilha de auditoria de todos os CRUDs (quem fez, o quê, quando)
-- Aviso de expiração de senha na interface (7 e 3 dias)
-
-### Administração
-- 3 perfis de acesso: Master, Admin, Operador
-- Reset de senha com senha temporária forte
-- Logs de auditoria filtráveis e exportáveis
-- Gerenciamento completo de usuários
+Cada equipamento pode ser identificado por QR Code e suas movimentações ficam registradas, permitindo consultar o histórico e identificar quando cada dispositivo entrou ou saiu.
 
 ---
 
-## 🛠️ Stack Técnica
+## Principais funcionalidades
 
-| Camada | Tecnologia |
-|--------|-----------|
-| Backend | Django 6.0 + Django REST Framework |
-| Autenticação | JWT customizado (SimpleJWT) |
-| Frontend | Flutter Web |
-| Banco de dados | SQLite (dev) / PostgreSQL (prod) |
-| Documentação API | drf-spectacular (OpenAPI 3.0 / Swagger) |
-| Impressão de etiquetas | Niimbot D11 via ZIP de PNGs |
-| Controle de versão | Git + GitHub |
+### Rastreamento por QR Code
+
+- QR Code individual por dispositivo
+- Leitura por scanner USB
+- Registro de entrada e saída
+- Identificação automática do tipo de movimentação com base no último registro
+- Histórico das movimentações
+
+### Painel operacional
+
+- Interface dedicada para monitor de portaria
+- Exibição das últimas leituras
+- Atualização das movimentações
+- Identificação visual do equipamento processado
+
+### Gestão de equipamentos
+
+- Cadastro de equipamentos
+- Associação entre equipamento, colaborador e QR Code
+- Vinculação e desvinculação de QR Codes
+- Consulta do histórico de movimentações
+- Filtros de pesquisa
+- Exportação de dados para Excel
+
+### Usuários e permissões
+
+O sistema possui três perfis de acesso:
+
+- **Master**
+- **Admin**
+- **Operador**
+
+Cada perfil possui permissões específicas de acordo com sua função dentro do sistema.
+
+### Auditoria
+
+Operações relevantes são registradas para permitir rastreabilidade das alterações realizadas no sistema.
+
+Os registros permitem identificar informações como:
+
+- usuário responsável;
+- operação executada;
+- data e horário;
+- objeto afetado.
+
+Os logs podem ser consultados e filtrados pela interface.
 
 ---
 
-## 📡 Documentação da API
+## Tecnologias
 
-A API é documentada automaticamente via Swagger UI:
+### Back-end
 
-```
-GET /api/docs/     → Interface Swagger interativa
-GET /api/schema/   → Schema OpenAPI 3.0 (JSON)
-```
+- Python
+- Django
+- Django REST Framework
+- SimpleJWT
+- PostgreSQL
+- SQLite
 
-Principais endpoints:
+### Front-end
 
-```
-POST /api/v1/login-auto/          → Autenticação JWT
-POST /api/v1/scan/                → Scan QR (auto CHECK-IN / CHECK-OUT)
-GET  /api/v1/ultimos-registros/   → Feed do painel de portaria
-GET  /api/v1/meu-perfil/          → Perfil + dias até expirar senha
-GET  /api/v1/logs-auditoria/      → Trilha de auditoria
-POST /api/v1/resetar-senha/       → Reset de senha pelo Master
-GET  /api/v1/exportar-excel/      → Exportação de dados
-```
+- Flutter Web
+- Dart
+
+### API e documentação
+
+- REST
+- OpenAPI 3.0
+- drf-spectacular
+- Swagger UI
+
+### Desenvolvimento e versionamento
+
+- Git
+- GitHub
 
 ---
 
-## 🏗️ Arquitetura
+## Arquitetura
 
+O RESE+ utiliza uma arquitetura cliente-servidor:
+
+```text
+Flutter Web
+     │
+     │ HTTP / REST
+     ▼
+Django REST Framework
+     │
+     ├── autenticação
+     ├── regras de negócio
+     ├── controle de acesso
+     ├── auditoria
+     └── movimentações
+     │
+     ▼
+PostgreSQL
 ```
+
+O front-end Flutter consome a API REST desenvolvida com Django REST Framework.
+
+Em desenvolvimento, o projeto pode utilizar SQLite. O ambiente de produção utiliza PostgreSQL.
+
+---
+
+## Estrutura do back-end
+
+```text
 rese-plus/
-├── rese_plus_api/          # Configurações Django
+├── rese_plus_api/
 │   ├── settings.py
 │   └── urls.py
-└── dispositivos/           # App principal
-    ├── models.py           # Usuario, Dispositivo, Empregado,
-    │                       # Registro, QrCode, LogAuditoria
-    ├── views.py            # Toda a lógica de negócio
+│
+└── dispositivos/
+    ├── models.py
+    ├── views.py
     ├── serializers.py
-    ├── authentication.py   # JWT customizado p/ modelo Usuario
+    ├── authentication.py
     └── migrations/
 ```
 
-```
-flutter-app/
-└── lib/
-    ├── modules/
-    │   ├── auth/           # Login, TrocarSenha
-    │   └── rese/
-    │       ├── pages/      # Painel, Scanner, Histórico,
-    │       │               # Dispositivos, QrCodes, Exportação,
-    │       │               # Logs, MeuPerfil, Gerenciar Usuários
-    │       └── rese_home_page.dart
-    └── services/
-        ├── api_service.dart    # Comunicação com o backend
-        └── auth_service.dart   # Gestão de tokens JWT
+Entre as principais entidades da aplicação estão:
+
+```text
+Usuario
+Dispositivo
+Empregado
+Registro
+QrCode
+LogAuditoria
 ```
 
 ---
 
-## ⚙️ Como rodar localmente
+## Estrutura do front-end
 
-### Backend
+```text
+flutter-app/
+└── lib/
+    ├── modules/
+    │   ├── auth/
+    │   └── rese/
+    │       ├── pages/
+    │       └── rese_home_page.dart
+    │
+    └── services/
+        ├── api_service.dart
+        └── auth_service.dart
+```
+
+Os serviços centralizam a comunicação com a API e o gerenciamento da autenticação.
+
+---
+
+## API REST
+
+A API possui documentação automática utilizando OpenAPI 3.0 e Swagger UI.
+
+### Documentação
+
+```text
+GET /api/docs/
+GET /api/schema/
+```
+
+### Alguns endpoints
+
+```text
+POST /api/v1/login-auto/
+POST /api/v1/scan/
+GET  /api/v1/ultimos-registros/
+GET  /api/v1/meu-perfil/
+GET  /api/v1/logs-auditoria/
+POST /api/v1/resetar-senha/
+GET  /api/v1/exportar-excel/
+```
+
+O endpoint de scan concentra a lógica de movimentação por QR Code e determina o registro correspondente a partir do estado atual do equipamento.
+
+---
+
+## Autenticação e segurança
+
+O RESE+ implementa mecanismos de autenticação e controle de acesso, incluindo:
+
+- autenticação baseada em JWT;
+- perfis com permissões distintas;
+- expiração configurável de senha;
+- troca obrigatória de senha quando aplicável;
+- limitação de tentativas de autenticação;
+- bloqueio após tentativas consecutivas;
+- trilha de auditoria;
+- avisos de proximidade da expiração da senha.
+
+A interface informa ao usuário quando a senha está próxima do vencimento.
+
+---
+
+## Banco de dados
+
+O projeto utiliza:
+
+```text
+SQLite      → desenvolvimento
+PostgreSQL  → produção
+```
+
+A modelagem contempla usuários, empregados, dispositivos, QR Codes, movimentações e registros de auditoria.
+
+---
+
+## Fluxo de movimentação
+
+De forma simplificada:
+
+```text
+QR Code lido
+     │
+     ▼
+API recebe o identificador
+     │
+     ▼
+Equipamento é localizado
+     │
+     ▼
+Última movimentação é consultada
+     │
+     ▼
+Sistema determina a nova movimentação
+     │
+     ├── CHECK-IN
+     │
+     └── CHECK-OUT
+     │
+     ▼
+Registro é persistido
+     │
+     ▼
+Movimentação aparece no histórico/painel
+```
+
+Essa lógica reduz a necessidade de o operador selecionar manualmente o tipo de movimentação a cada leitura.
+
+---
+
+## Como executar localmente
+
+### Back-end
+
+Clone o repositório:
 
 ```bash
-# Clonar e entrar na pasta
 git clone https://github.com/rjaqueline/rese-plus.git
 cd rese-plus
+```
 
-# Ambiente virtual
+Crie o ambiente virtual:
+
+```bash
 python -m venv venv
-venv\Scripts\Activate      # Windows
-source venv/bin/activate   # Linux/Mac
+```
 
-# Dependências
+Ative o ambiente.
+
+Windows:
+
+```powershell
+venv\Scripts\Activate
+```
+
+Linux/macOS:
+
+```bash
+source venv/bin/activate
+```
+
+Instale as dependências:
+
+```bash
 pip install -r requirements.txt
+```
 
-# Banco de dados
+Execute as migrações:
+
+```bash
 python manage.py migrate
+```
 
-# Criar superusuário
-python manage.py shell -c "
-from dispositivos.models import Usuario
-from django.contrib.auth.hashers import make_password
-Usuario.objects.create(
-    username='admin',
-    nome='Administrador',
-    perfil='master',
-    senha=make_password('Admin@2026'),
-    ativo=True
-)
-"
+Crie um usuário administrativo para o ambiente local:
 
-# Rodar
+```bash
+python manage.py createsuperuser
+```
+
+Inicie o servidor:
+
+```bash
 python manage.py runserver
 ```
 
-### Frontend (Flutter)
+---
+
+## Front-end
+
+Entre no projeto Flutter:
 
 ```bash
 cd flutter-app
+```
+
+Instale as dependências:
+
+```bash
 flutter pub get
+```
+
+Execute no navegador:
+
+```bash
 flutter run -d chrome --web-port=3000
 ```
 
 ---
 
-## 🔒 Segurança & Conformidade
+## Decisões de projeto
 
-| Requisito | Implementação |
-|-----------|--------------|
-| Rastreabilidade | Log de auditoria em 100% das operações |
-| Controle de acesso | 3 perfis com permissões distintas |
-| Proteção de credenciais | JWT + expiração + rate limiting |
-| Política de senha | Expiração configurável + troca obrigatória |
-| Proteção contra força bruta | Bloqueio após 5 tentativas (HTTP 423) |
+### QR Code como identificador operacional
+
+O QR Code reduz a necessidade de digitação manual durante as movimentações e permite que o registro seja realizado diretamente no ponto de controle.
+
+### Determinação automática de entrada e saída
+
+O operador não precisa escolher manualmente entre CHECK-IN e CHECK-OUT.
+
+A aplicação consulta o último estado registrado e determina a próxima movimentação.
+
+### Separação entre interface e regras de negócio
+
+O Flutter é responsável pela interface e interação com o usuário, enquanto as regras de negócio e persistência ficam concentradas no back-end Django.
+
+### PostgreSQL em produção
+
+O SQLite facilita o desenvolvimento local, enquanto o PostgreSQL é utilizado no ambiente de produção.
+
+### Auditoria integrada
+
+A rastreabilidade foi considerada desde a modelagem do sistema, permitindo registrar operações relevantes e identificar quem realizou cada alteração.
 
 ---
 
-## 📊 Contexto de Desenvolvimento
+## Status
 
-- **Desenvolvido por:** Jaqueline Batista
-- **Início:** Novembro 2025
-- **Contexto:** Projeto independente, desenvolvido em paralelo à função administrativa na Mineração Taboca
-- **Status:** Em fase de testes com implantação prevista para 2026
+O RESE+ foi desenvolvido como projeto independente em paralelo à minha atuação profissional na área administrativa e operacional.
 
----
-
-## 📄 Licença
-
-Este sistema foi desenvolvido por **Jaqueline Batista** e cedido para uso pela Mineração Taboca sob Termo de Cessão Limitada de Uso. A propriedade intelectual permanece com a autora.
+O sistema surgiu da observação de um processo real e foi desenvolvido desde o levantamento da necessidade até a implementação da API, interface, banco de dados, autenticação, regras de negócio, testes e preparação para implantação.
 
 ---
 
-*Desenvolvido com 🖤 e muito café em Manaus, AM.*
+## Autoria
+
+Desenvolvido por **Jaqueline Batista**.
+
+---
+
+## Licença e uso
+
+Projeto desenvolvido de forma independente.
+
+O uso do sistema em ambiente corporativo está sujeito às condições acordadas com a organização onde a solução foi aplicada.
+
+O código disponibilizado neste repositório tem finalidade de demonstração técnica e portfólio.
